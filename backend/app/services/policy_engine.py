@@ -11,6 +11,8 @@ in 30 real seconds during a demo.
 
 from __future__ import annotations
 
+from typing import Optional
+
 from dataclasses import dataclass
 from datetime import datetime, timezone
 
@@ -24,13 +26,13 @@ class Decision:
 
     dataset_id: str
     eligible: bool
-    target_tier: Tier | None
+    target_tier: Optional[Tier]
     inactive_days: float
-    policy_name: str | None
+    policy_name: Optional[str]
     reason: str
 
 
-def inactive_days(dataset: Dataset, *, now: datetime | None = None) -> float:
+def inactive_days(dataset: Dataset, *, now: Optional[datetime] = None) -> float:
     """Inactivity in simulated days = real_seconds_elapsed / time_unit_seconds."""
     now = now or datetime.now(timezone.utc)
     last = dataset.last_accessed_at
@@ -69,7 +71,7 @@ def evaluate(
     policies: list[Policy],
     exceptions: list[PolicyException],
     *,
-    now: datetime | None = None,
+    now: Optional[datetime] = None,
 ) -> Decision:
     """Decide whether ``dataset`` should move tiers right now.
 

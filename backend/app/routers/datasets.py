@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from typing import Optional
+
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 
@@ -52,9 +54,9 @@ def create_dataset(payload: DatasetCreate, db: Session = Depends(get_db)) -> Dat
 @router.get("", response_model=list[DatasetOut])
 def list_datasets(
     db: Session = Depends(get_db),
-    tier: Tier | None = Query(default=None),
-    project: str | None = Query(default=None),
-    search: str | None = Query(default=None),
+    tier: Optional[Tier] = Query(default=None),
+    project: Optional[str] = Query(default=None),
+    search: Optional[str] = Query(default=None),
 ) -> list[DatasetOut]:
     """UC8 — Catalog lookup/search (transparent discoverability)."""
     rows = catalog.list_datasets(db, tier=tier, project=project, search=search)

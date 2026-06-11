@@ -11,8 +11,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from ..models import Dataset, Exception as PolicyException, Policy, Tier
-from ..schemas import CandidateOut, ScanSummary
-from . import catalog, policy_engine
+from ..schemas import CandidateOut, RecommendationReport, ScanSummary
+from . import ai_advisor, catalog, policy_engine
 
 
 def _load_rules(db: Session) -> tuple[list[Policy], list[PolicyException]]:
@@ -21,8 +21,17 @@ def _load_rules(db: Session) -> tuple[list[Policy], list[PolicyException]]:
     return policies, exceptions
 
 
+def _movable(db: Session, exceptions: list[PolicyException]) -> list[Dataset]:
+    """All datasets that are not hard-exempt (the AI advisor's candidate set)."""
+    return [
+        d
+        for d in db.scalars(select(Dataset)).all()
+        if not policy_engine.is_exempt(d, exceptions)
+    ]
+
+
 def candidates(db: Session) -> list[CandidateOut]:
-    """UC6 — preview datasets currently eligible for movement (no side effects)."""
+    """UC6 — deterministic preview of datasets eligible by policy (no side effects)."""
     policies, exceptions = _load_rules(db)
     out: list[CandidateOut] = []
     for dataset in db.scalars(select(Dataset)).all():
@@ -41,32 +50,46 @@ def candidates(db: Session) -> list[CandidateOut]:
     return out
 
 
-def scan(db: Session) -> ScanSummary:
-    """UC6 + UC7 — evaluate every dataset and move those that are eligible.
+def recommendations(db: Session) -> RecommendationReport:
+    """Ask the AI advisor what it would do with every movable dataset (no moves)."""
+    policies, exceptions = _load_rules(db)
+    return ai_advisor.recommend(_movable(db, exceptions), policies, exceptions)
 
-    Runs from both the manual trigger endpoint and the background scheduler, so
-    it must be safe to call concurrently with request handlers (each gets its
-    own session). Returns a summary suitable for logging and the API response.
+
+def scan(db: Session) -> ScanSummary:
+    """UC6 + UC7 — let the AI advisor decide, then execute the moves it recommends.
+
+    The advisor weighs policy + criticality + cost/GB for every non-exempt
+    dataset; exempt datasets are never offered to it. Runs from both the manual
+    trigger and the background scheduler (each gets its own session). The AI's
+    rationale is recorded on each move event for the audit trail.
     """
     policies, exceptions = _load_rules(db)
+    all_datasets = list(db.scalars(select(Dataset)).all())
+    movable = [d for d in all_datasets if not policy_engine.is_exempt(d, exceptions)]
+    skipped_exception = len(all_datasets) - len(movable)
 
-    scanned = 0
+    report = ai_advisor.recommend(movable, policies, exceptions)
+    by_id = {d.id: d for d in movable}
+
     moved = 0
-    skipped_exception = 0
     bytes_reclaimed_from_hot = 0
     moves: list[dict] = []
 
-    for dataset in db.scalars(select(Dataset)).all():
-        scanned += 1
-        decision = policy_engine.evaluate(dataset, policies, exceptions)
-
-        if not decision.eligible or decision.target_tier is None:
-            if policy_engine.is_exempt(dataset, exceptions):
-                skipped_exception += 1
+    for rec in report.recommendations:
+        if rec.action != "move" or rec.target_tier is None:
+            continue
+        dataset = by_id.get(rec.dataset_id)
+        if dataset is None or rec.target_tier == dataset.tier:
             continue
 
         from_tier = dataset.tier
-        catalog.move_dataset(db, dataset, decision.target_tier, reason=decision.reason)
+        catalog.move_dataset(
+            db,
+            dataset,
+            rec.target_tier,
+            reason=f"AI ({report.engine}): {rec.rationale}",
+        )
         moved += 1
         if from_tier == Tier.hot:
             bytes_reclaimed_from_hot += dataset.size_bytes
@@ -75,16 +98,20 @@ def scan(db: Session) -> ScanSummary:
                 "dataset_id": dataset.id,
                 "name": dataset.name,
                 "from_tier": from_tier.value,
-                "to_tier": decision.target_tier.value,
-                "inactive_days": round(decision.inactive_days, 2),
-                "policy": decision.policy_name,
+                "to_tier": rec.target_tier.value,
+                "inactive_days": rec.inactive_days,
+                "criticality_score": rec.criticality_score,
+                "monthly_savings_usd": rec.monthly_savings_usd,
+                "confidence": rec.confidence,
+                "rationale": rec.rationale,
             }
         )
 
     return ScanSummary(
-        scanned=scanned,
+        scanned=len(all_datasets),
         moved=moved,
         skipped_exception=skipped_exception,
         bytes_reclaimed_from_hot=bytes_reclaimed_from_hot,
+        engine=report.engine,
         moves=moves,
     )

@@ -14,10 +14,11 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .config import settings
-from .db import SessionLocal, init_db
+from .db import SessionLocal, init_db, reset_db
 from .routers import dashboard, datasets, lifecycle, policies
 from .scheduler import shutdown_scheduler, start_scheduler
 from .seed import seed_if_empty
+from .storage.backend import storage_backend
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger("simlifecycle")
@@ -25,7 +26,13 @@ logger = logging.getLogger("simlifecycle")
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    init_db()
+    if settings.reset_on_startup:
+        reset_db()
+        if hasattr(storage_backend, "clear"):
+            storage_backend.clear()
+        logger.info("Reset database and cleared simulated storage on startup")
+    else:
+        init_db()
     if settings.seed_on_startup:
         db = SessionLocal()
         try:

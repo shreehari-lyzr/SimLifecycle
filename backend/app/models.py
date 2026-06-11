@@ -12,6 +12,8 @@ cases:
 
 from __future__ import annotations
 
+from typing import Optional
+
 import enum
 from datetime import datetime, timezone
 
@@ -44,6 +46,19 @@ class EventType(str, enum.Enum):
     restore = "restore"
 
 
+class DataClassification(str, enum.Enum):
+    public = "public"
+    internal = "internal"
+    confidential = "confidential"
+    restricted = "restricted"
+
+
+class BusinessValue(str, enum.Enum):
+    low = "low"
+    medium = "medium"
+    high = "high"
+
+
 class Dataset(Base):
     __tablename__ = "datasets"
 
@@ -66,6 +81,15 @@ class Dataset(Base):
     restore_status: Mapped[RestoreStatus] = mapped_column(
         Enum(RestoreStatus), default=RestoreStatus.none
     )
+
+    # --- Rich metadata consumed by the AI tiering advisor ----------------
+    # Soft 0-100 importance signal (distinct from the hard is_critical exempt
+    # flag): how reluctant the agent should be to tier this data down.
+    criticality_score: Mapped[int] = mapped_column(Integer, default=50)
+    data_classification: Mapped[str] = mapped_column(String(32), default=DataClassification.internal.value)
+    business_value: Mapped[str] = mapped_column(String(16), default=BusinessValue.medium.value)
+    tags: Mapped[list] = mapped_column(JSON, default=list)
+    description: Mapped[str] = mapped_column(Text, default="")
 
     events: Mapped[list["LifecycleEvent"]] = relationship(
         back_populates="dataset", cascade="all, delete-orphan"
@@ -100,8 +124,8 @@ class Exception(Base):
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     # Either a specific dataset or a whole project may be exempted.
-    dataset_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
-    project: Mapped[str | None] = mapped_column(String(255), nullable=True, index=True)
+    dataset_id: Mapped[Optional[str]] = mapped_column(String(36), nullable=True, index=True)
+    project: Mapped[Optional[str]] = mapped_column(String(255), nullable=True, index=True)
     reason: Mapped[str] = mapped_column(Text, default="")
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow)
 
@@ -112,8 +136,8 @@ class LifecycleEvent(Base):
     id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
     dataset_id: Mapped[str] = mapped_column(ForeignKey("datasets.id"), index=True)
     event_type: Mapped[EventType] = mapped_column(Enum(EventType))
-    from_tier: Mapped[Tier | None] = mapped_column(Enum(Tier), nullable=True)
-    to_tier: Mapped[Tier | None] = mapped_column(Enum(Tier), nullable=True)
+    from_tier: Mapped[Optional[Tier]] = mapped_column(Enum(Tier), nullable=True)
+    to_tier: Mapped[Optional[Tier]] = mapped_column(Enum(Tier), nullable=True)
     timestamp: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=utcnow, index=True)
     details: Mapped[str] = mapped_column(Text, default="")
 

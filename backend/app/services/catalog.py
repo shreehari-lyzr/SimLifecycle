@@ -9,6 +9,8 @@ directly — they call these functions.
 
 from __future__ import annotations
 
+from typing import Optional
+
 import uuid
 
 from sqlalchemy import select
@@ -31,8 +33,8 @@ def _record_event(
     dataset: Dataset,
     event_type: EventType,
     *,
-    from_tier: Tier | None = None,
-    to_tier: Tier | None = None,
+    from_tier: Optional[Tier] = None,
+    to_tier: Optional[Tier] = None,
     details: str = "",
 ) -> None:
     db.add(
@@ -53,7 +55,7 @@ def create_dataset(
     project: str,
     owner: str,
     model_ref: str = "",
-    run_config: dict | None = None,
+    run_config: Optional[dict] = None,
     size_bytes: int = 1_000_000_000,
 ) -> Dataset:
     """UC1 — create a dataset and store it in hot storage."""
@@ -111,7 +113,7 @@ def move_dataset(db: Session, dataset: Dataset, target_tier: Tier, *, reason: st
     return dataset
 
 
-def restore_dataset(db: Session, dataset: Dataset) -> tuple[Dataset, Tier | None]:
+def restore_dataset(db: Session, dataset: Dataset) -> tuple[Dataset, Optional[Tier]]:
     """UC3 — restore an archived dataset back to hot storage."""
     from_tier = dataset.tier
     if from_tier == Tier.hot:
@@ -143,16 +145,16 @@ def restore_dataset(db: Session, dataset: Dataset) -> tuple[Dataset, Tier | None
     return dataset, from_tier
 
 
-def get_dataset(db: Session, dataset_id: str) -> Dataset | None:
+def get_dataset(db: Session, dataset_id: str) -> Optional[Dataset]:
     return db.get(Dataset, dataset_id)
 
 
 def list_datasets(
     db: Session,
     *,
-    tier: Tier | None = None,
-    project: str | None = None,
-    search: str | None = None,
+    tier: Optional[Tier] = None,
+    project: Optional[str] = None,
+    search: Optional[str] = None,
 ) -> list[Dataset]:
     stmt = select(Dataset)
     if tier is not None:

@@ -13,11 +13,17 @@ from __future__ import annotations
 
 from pathlib import Path
 
+from dotenv import load_dotenv
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Repo layout: <repo>/backend/app/config.py  ->  repo root is two parents up
 BACKEND_DIR = Path(__file__).resolve().parent.parent
 REPO_ROOT = BACKEND_DIR.parent
+
+# Load backend/.env into the process environment before settings are read, so a
+# standard (unprefixed) ANTHROPIC_API_KEY in that file is picked up by both the
+# Anthropic SDK and the AI advisor's key check. SIMLC_-prefixed vars also work.
+load_dotenv(BACKEND_DIR / ".env")
 
 
 class Settings(BaseSettings):
@@ -35,10 +41,25 @@ class Settings(BaseSettings):
     time_unit_seconds: float = 1.0
 
     # How often the background lifecycle agent runs an automatic scan.
-    scan_interval_seconds: int = 5
+    scan_interval_seconds: int = 30
+
+    # Prototype convenience: drop + recreate all tables (and clear simulated
+    # storage) on every startup. Keeps the schema in sync as the models evolve
+    # without migrations. Set false to persist data across restarts.
+    reset_on_startup: bool = True
 
     # Whether to (re)seed demo data on startup if the DB is empty.
     seed_on_startup: bool = True
+
+    # --- AI tiering advisor ---------------------------------------------
+    # When true, tiering decisions are made by an LLM that weighs policy +
+    # data criticality + cost/GB. Falls back to a deterministic heuristic when
+    # no Anthropic API key is available, so the prototype always runs.
+    use_ai: bool = True
+    ai_model: str = "claude-opus-4-8"
+    # The SDK reads ANTHROPIC_API_KEY from the environment automatically; this
+    # mirror lets the API report whether a key is configured without leaking it.
+    anthropic_api_key: str = ""
 
     # CORS origins for the frontend dev server.
     cors_origins: list[str] = ["http://localhost:5173", "http://127.0.0.1:5173"]

@@ -41,3 +41,11 @@ def init_db() -> None:
     from . import models  # noqa: F401
 
     Base.metadata.create_all(bind=engine)
+
+
+def reset_db() -> None:
+    """Drop and recreate all tables — wipes the catalog to a clean schema."""
+    from . import models  # noqa: F401
+
+    Base.metadata.drop_all(bind=engine)
+    Base.metadata.create_all(bind=engine)

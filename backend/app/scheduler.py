@@ -7,6 +7,8 @@ exposed via the API for on-demand runs.
 
 from __future__ import annotations
 
+from typing import Optional
+
 import logging
 
 from apscheduler.schedulers.background import BackgroundScheduler
@@ -17,7 +19,7 @@ from .services import lifecycle_agent
 
 logger = logging.getLogger("simlifecycle.scheduler")
 
-_scheduler: BackgroundScheduler | None = None
+_scheduler: Optional[BackgroundScheduler] = None
 
 
 def _run_scan_job() -> None:

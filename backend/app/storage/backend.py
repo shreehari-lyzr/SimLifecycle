@@ -12,6 +12,8 @@ API responses can demonstrate realistic trade-offs.
 
 from __future__ import annotations
 
+from typing import Optional
+
 import shutil
 from abc import ABC, abstractmethod
 from pathlib import Path
@@ -62,7 +64,7 @@ class LocalTieredStorage(StorageBackend):
     location represent the dataset's physical placement.
     """
 
-    def __init__(self, root: Path | None = None) -> None:
+    def __init__(self, root: Optional[Path] = None) -> None:
         self.root = Path(root or settings.storage_root)
         for tier in Tier:
             (self.root / tier.value).mkdir(parents=True, exist_ok=True)
@@ -89,6 +91,13 @@ class LocalTieredStorage(StorageBackend):
     def delete(self, tier: Tier, dataset_id: str) -> None:
         path = self._path(tier, dataset_id)
         path.unlink(missing_ok=True)
+
+    def clear(self) -> None:
+        """Remove all payloads from every tier (used on startup reset)."""
+        for tier in Tier:
+            tier_dir = self.root / tier.value
+            for f in tier_dir.glob("*.bin"):
+                f.unlink(missing_ok=True)
 
 
 # Module-level singleton used across the app.
