@@ -3,11 +3,13 @@ import Dashboard from "./pages/Dashboard";
 import Catalog from "./pages/Catalog";
 import Policies from "./pages/Policies";
 import Events from "./pages/Events";
+import AIAdvisor from "./pages/AIAdvisor";
 
-type Page = "dashboard" | "catalog" | "policies" | "events";
+type Page = "dashboard" | "advisor" | "catalog" | "policies" | "events";
 
 const NAV: { key: Page; label: string }[] = [
   { key: "dashboard", label: "Dashboard" },
+  { key: "advisor", label: "AI Advisor" },
   { key: "catalog", label: "Data Catalog" },
   { key: "policies", label: "Policies" },
   { key: "events", label: "Lifecycle Events" },
@@ -33,6 +35,7 @@ export default function App() {
       </aside>
       <main className="main">
         {page === "dashboard" && <Dashboard />}
+        {page === "advisor" && <AIAdvisor />}
         {page === "catalog" && <Catalog />}
         {page === "policies" && <Policies />}
         {page === "events" && <Events />}

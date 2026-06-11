@@ -22,6 +22,35 @@ export function MetricCard({
   );
 }
 
+export function Criticality({ score }: { score: number }) {
+  const color = score >= 75 ? "#ff6b4a" : score >= 50 ? "#ffb84a" : "#3ecf8e";
+  return (
+    <span title={`Criticality ${score}/100`} className="row" style={{ gap: 6 }}>
+      <span
+        style={{
+          display: "inline-block",
+          width: 44,
+          height: 6,
+          borderRadius: 4,
+          background: "var(--panel-2)",
+          position: "relative",
+          overflow: "hidden",
+        }}
+      >
+        <span
+          style={{
+            position: "absolute",
+            inset: 0,
+            width: `${score}%`,
+            background: color,
+          }}
+        />
+      </span>
+      <span style={{ fontSize: 12, color: "var(--muted)" }}>{score}</span>
+    </span>
+  );
+}
+
 export function formatBytes(bytes: number): string {
   if (bytes >= 1e9) return `${(bytes / 1e9).toFixed(1)} GB`;
   if (bytes >= 1e6) return `${(bytes / 1e6).toFixed(0)} MB`;

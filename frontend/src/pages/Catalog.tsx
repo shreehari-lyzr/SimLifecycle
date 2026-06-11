@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { api, type Dataset, type Tier } from "../api/client";
-import { TierBadge, formatBytes, timeAgo } from "../components/common";
+import { Criticality, TierBadge, formatBytes, timeAgo } from "../components/common";
 
 export default function Catalog() {
   const [datasets, setDatasets] = useState<Dataset[]>([]);
@@ -78,9 +78,9 @@ export default function Catalog() {
               <th>Name</th>
               <th>Project</th>
               <th>Tier</th>
+              <th>Criticality</th>
               <th>Size</th>
               <th>Last Access</th>
-              <th>Accesses</th>
               <th>Actions</th>
             </tr>
           </thead>
@@ -101,9 +101,9 @@ export default function Catalog() {
                 </td>
                 <td className="muted">{d.project}</td>
                 <td><TierBadge tier={d.tier} /></td>
+                <td><Criticality score={d.criticality_score} /></td>
                 <td>{formatBytes(d.size_bytes)}</td>
                 <td className="muted">{timeAgo(d.last_accessed_at)}</td>
-                <td>{d.access_count}</td>
                 <td>
                   <div className="row">
                     <button className="btn small" onClick={() => access(d)}>Access</button>
@@ -131,17 +131,28 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
   const [project, setProject] = useState("");
   const [owner, setOwner] = useState("");
   const [sizeGb, setSizeGb] = useState(2);
+  const [criticality, setCriticality] = useState(50);
+  const [businessValue, setBusinessValue] = useState("medium");
+  const [description, setDescription] = useState("");
 
   const submit = async () => {
     if (!name || !project || !owner) return;
-    await api.createDataset({ name, project, owner, size_bytes: sizeGb * 1_000_000_000 });
+    await api.createDataset({
+      name,
+      project,
+      owner,
+      size_bytes: sizeGb * 1_000_000_000,
+      criticality_score: criticality,
+      business_value: businessValue,
+      description,
+    });
     onCreated();
   };
 
   return (
     <div className="card" style={{ marginBottom: 16 }}>
       <h3>New Simulation Dataset</h3>
-      <div className="row">
+      <div className="row" style={{ marginBottom: 10 }}>
         <input placeholder="Dataset name" value={name} onChange={(e) => setName(e.target.value)} />
         <input placeholder="Project" value={project} onChange={(e) => setProject(e.target.value)} />
         <input placeholder="Owner" value={owner} onChange={(e) => setOwner(e.target.value)} />
@@ -153,6 +164,28 @@ function CreateForm({ onCreated }: { onCreated: () => void }) {
           style={{ width: 90 }}
         />
         <span className="muted">GB</span>
+      </div>
+      <div className="row">
+        <span className="muted">Criticality</span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          value={criticality}
+          onChange={(e) => setCriticality(Number(e.target.value))}
+        />
+        <span style={{ width: 28 }}>{criticality}</span>
+        <select value={businessValue} onChange={(e) => setBusinessValue(e.target.value)}>
+          <option value="low">low value</option>
+          <option value="medium">medium value</option>
+          <option value="high">high value</option>
+        </select>
+        <input
+          placeholder="Description (for the AI advisor)"
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          style={{ flex: 1 }}
+        />
         <button className="btn primary" onClick={submit}>Create in Hot</button>
       </div>
     </div>

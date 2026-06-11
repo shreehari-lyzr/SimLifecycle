@@ -19,6 +19,11 @@ export interface Dataset {
   access_count: number;
   is_critical: boolean;
   restore_status: RestoreStatus;
+  criticality_score: number;
+  data_classification: string;
+  business_value: string;
+  tags: string[];
+  description: string;
   is_exempt: boolean;
   exempt_reasons: string[];
 }
@@ -55,7 +60,36 @@ export interface ScanSummary {
   moved: number;
   skipped_exception: number;
   bytes_reclaimed_from_hot: number;
+  engine: "ai" | "heuristic";
   moves: Array<Record<string, unknown>>;
+}
+
+export interface Recommendation {
+  dataset_id: string;
+  name: string;
+  project: string;
+  current_tier: Tier;
+  action: "keep" | "move";
+  target_tier: Tier | null;
+  confidence: number;
+  rationale: string;
+  inactive_days: number;
+  criticality_score: number;
+  business_value: string;
+  policy_eligible: boolean;
+  monthly_savings_usd: number;
+}
+
+export interface RecommendationReport {
+  engine: "ai" | "heuristic";
+  model: string | null;
+  recommendations: Recommendation[];
+}
+
+export interface AIStatus {
+  engine: "ai" | "heuristic";
+  model: string | null;
+  use_ai: boolean;
 }
 
 export interface TierStats {
@@ -115,6 +149,10 @@ export const api = {
     project: string;
     owner: string;
     size_bytes: number;
+    criticality_score?: number;
+    business_value?: string;
+    data_classification?: string;
+    description?: string;
   }) => req<Dataset>("/datasets", { method: "POST", body: JSON.stringify(body) }),
   accessDataset: (id: string, op_type: "read" | "write") =>
     req<{ dataset: Dataset; latency_ms: number; note: string }>(
@@ -145,6 +183,8 @@ export const api = {
 
   // Lifecycle
   candidates: () => req<Candidate[]>("/lifecycle/candidates"),
+  recommendations: () => req<RecommendationReport>("/lifecycle/recommendations"),
+  aiStatus: () => req<AIStatus>("/lifecycle/ai-status"),
   runScan: () => req<ScanSummary>("/lifecycle/run", { method: "POST" }),
 
   // Dashboard
